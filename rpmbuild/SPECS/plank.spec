@@ -1,11 +1,29 @@
-Name:           plank
-Summary:        A port of docky to Vala
-Version:        0.11.4
-Release:        6%{?dist}
-License:        GPLv3+
-URL:            http://wiki.go-docky.com/index.php?title=Plank:Introduction
+%global common_description %{expand:
+Plank is meant to be the simplest dock on the planet. The goal is to
+provide just what a dock needs and absolutely nothing more. It is,
+however, a library which can be extended to create other dock programs
+with more advanced features.
 
-Source0:        https://launchpad.net/%{name}/1.0/%{version}/+download/%{name}-%{version}.tar.xz
+Thus, Plank is the underlying technology for Docky (starting in version
+3.0.0) and aims to provide all the core features while Docky extends it
+to add fancier things like Docklets, painters, settings dialogs, etc.}
+
+Name:           plank
+Summary:        Stupidly simple Dock
+Version:        0.11.89
+Release:        8%{?dist}
+License:        GPLv3+
+
+URL:            https://launchpad.net/%{name}
+Source0:        %{url}/1.0/%{version}/+download/%{name}-%{version}.tar.xz
+
+# patch out support patented MacOS style animation
+# Patch0:         00-drop-patented-animation.patch
+# Remove patch0 to get zoom icon support
+
+# patch .desktop file to hide the launcher in Pantheon,
+# plank is already a default shell component there
+Patch0:         00-hide-in-pantheon.patch
 
 BuildRequires:  desktop-file-utils
 BuildRequires:  gettext
@@ -14,7 +32,6 @@ BuildRequires:  libappstream-glib
 BuildRequires:  libtool
 BuildRequires:  pkgconfig
 BuildRequires:  vala
-BuildRequires:  vala-tools
 
 BuildRequires:  pkgconfig(cairo) >= 1.13
 BuildRequires:  pkgconfig(dbusmenu-glib-0.4) >= 0.4
@@ -30,65 +47,67 @@ BuildRequires:  pkgconfig(x11)
 BuildRequires:  pkgconfig(xi) >= 1.6.99.1
 BuildRequires:  pkgconfig(xfixes) >= 5.0
 
+Requires:       %{name}-libs%{?_isa} = %{version}-%{release}
 
 Requires:       bamf-daemon
 Requires:       hicolor-icon-theme
 
+%description %{common_description}
 
-%description
-A very simple dock written in Vala.
+
+%package        libs
+Summary:        Shared libraries for %{name}
+
+%description    libs %{common_description}
+This package contains the shared libraries.
 
 
 %package        docklets
 Summary:        Docklets for %{name}
+
 Requires:       %{name}%{?_isa} = %{version}-%{release}
 
-%description    docklets
-Development files for %{name}
+%description    docklets %{common_description}
+This package contains the docklets for plank.
 
 
 %package        devel
 Summary:        Development files for %{name}
-Requires:       %{name}%{?_isa} = %{version}-%{release}
-Requires:       vala-tools
 
-%description    devel
-Development files for %{name}
+Requires:       %{name}-libs%{?_isa} = %{version}-%{release}
+
+%description    devel %{common_description}
+This package contains the files necessary to develop against plank.
 
 
 %prep
-%setup -q
+%autosetup -p1
+
 
 %build
 %configure --disable-apport
-
-# Remove rpath
-sed -i 's|^hardcode_libdir_flag_spec=.*|hardcode_libdir_flag_spec=""|g' libtool
-sed -i 's|^runpath_var=LD_RUN_PATH|runpath_var=DIE_RPATH_DIE|g' libtool
-
-# Fix unused-direct-shlib-dependency from rpmlint
-sed -i -e 's! -shared ! -Wl,--as-needed\0!g' libtool
-
 %make_build
 
 
 %install
 %make_install
 
-# Remove built .la files
-rm -f %{buildroot}/%{_libdir}/lib%{name}.la
-rm -f %{buildroot}/%{_libdir}/%{name}/docklets/libdocklet-*.la
-
 %find_lang %{name}
+
+# remove libtool archives from the buildroot
+find %{buildroot} -name "*.la" -print -delete
+
+# move appdata file to non-deprecated location
+#mv %{buildroot}/%{_datadir}/appdata %{buildroot}/%{_datadir}/metainfo
 
 
 %check
-desktop-file-validate %{buildroot}/%{_datadir}/applications/%{name}.desktop
-appstream-util validate-relax --nonet %{buildroot}/%{_datadir}/appdata/%{name}.appdata.xml
+desktop-file-validate \
+    %{buildroot}/%{_datadir}/applications/%{name}.desktop
 
-%post -p /sbin/ldconfig
+appstream-util validate-relax --nonet \
+    %{buildroot}/%{_datadir}/metainfo/%{name}.appdata.xml
 
-%postun -p /sbin/ldconfig
 
 %files -f %{name}.lang
 %doc AUTHORS ChangeLog
@@ -96,23 +115,36 @@ appstream-util validate-relax --nonet %{buildroot}/%{_datadir}/appdata/%{name}.a
 
 %{_bindir}/%{name}
 
-%{_libdir}/lib%{name}.so.1
-%{_libdir}/lib%{name}.so.1.0.0
-%dir %{_libdir}/%{name}
-
-%{_mandir}/man1/%{name}.1*
-
-%{_datadir}/appdata/%{name}.appdata.xml
 %{_datadir}/applications/%{name}.desktop
 %{_datadir}/glib-2.0/schemas/net.launchpad.%{name}.gschema.xml
 %{_datadir}/icons/hicolor/*/apps/%{name}.svg
+%{_datadir}/metainfo/%{name}.appdata.xml
 %{_datadir}/%{name}/
 
-%files          docklets
+%{_mandir}/man1/%{name}.1*
+
+
+%files libs
+%doc AUTHORS ChangeLog
+%license COPYING
+
+%{_libdir}/lib%{name}.so.1*
+
+%dir %{_libdir}/%{name}
+
+
+%files docklets
+%doc AUTHORS ChangeLog
+%license COPYING
+
 %dir %{_libdir}/%{name}/docklets
 %{_libdir}/%{name}/docklets/*.so
 
-%files          devel
+
+%files devel
+%doc AUTHORS ChangeLog
+%license COPYING
+
 %{_libdir}/lib%{name}.so
 %{_libdir}/pkgconfig/%{name}.pc
 
@@ -123,6 +155,13 @@ appstream-util validate-relax --nonet %{buildroot}/%{_datadir}/appdata/%{name}.a
 
 
 %changelog
+* Sat Feb 02 2019 Fedora Release Engineering <releng@fedoraproject.org> - 0.11.4-8
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_30_Mass_Rebuild
+
+* Thu Nov 29 2018 Fabio Valentini <decathorpe@gmail.com> - 0.11.4-7
+- Hide plank launcher in Pantheon.
+- Modernize .spec file.
+
 * Fri Jul 13 2018 Fedora Release Engineering <releng@fedoraproject.org> - 0.11.4-6
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_29_Mass_Rebuild
 
@@ -219,4 +258,3 @@ appstream-util validate-relax --nonet %{buildroot}/%{_datadir}/appdata/%{name}.a
 
 * Wed Jan 16 2013 Wesley Hearn <whearn@redhat.com> - 0.0-1.20130116bzr722
 - Initial package
-
