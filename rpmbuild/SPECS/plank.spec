@@ -23,7 +23,7 @@ Source0:        %{url}/1.0/%{version}/+download/%{name}-%{version}.tar.xz
 
 # patch .desktop file to hide the launcher in Pantheon,
 # plank is already a default shell component there
-Patch0:         00-hide-in-pantheon.patch
+# Patch0:         00-hide-in-pantheon.patch
 
 BuildRequires:  desktop-file-utils
 BuildRequires:  gettext
